@@ -295,7 +295,7 @@ impl std::ops::Mul<f64> for Complex8 {
 
 impl std::ops::DivAssign<Complex8> for Complex8 {
     #[inline]
-    fn div_assign(&mut self, mut other: Complex8) {
+    fn div_assign(&mut self, other: Complex8) {
         // im = xi * yi
         let im: f64x8 = self.im * other.im;
         // comp = -xr * yi
