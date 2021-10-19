@@ -12,12 +12,14 @@ pub use polynomial::Polynomial;
 mod complex_simd;
 use complex_simd::Complex8;
 
-const WIDTH: u32 = 100;
-const HEIGHT: u32 = 100;
+const WIDTH: u32 = 1000;
+const HEIGHT: u32 = 1000;
 const ITERATIONS: usize = 1000;
 const SCALE: f64 = 0.3;
 const EPSILON: f64 = 0.02;
 const A: f64 = 1.8;
+
+const USE_SIMD: bool = false;
 
 fn ring(length: usize) -> Vec<Complex<f64>> {
     let mut res = Vec::with_capacity(length);
@@ -149,60 +151,76 @@ fn main() {
 
 fn calc_row(y: u32, table: &mut [usize], roots: &[Complex<f64>], f: &Polynomial, df: &Polynomial, center: &Complex<f64>) {
     let mut x: u32 = 0;
-    while x + 7 < WIDTH {
-        let mut c = [Complex::new(0.0, 0.0); 8];
-        for i in 0..8u32 {
-            c[i as usize] = Complex::new((x + i) as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0);
-        }
-        let mut c = (Complex8::from(c) / WIDTH.max(HEIGHT) as f64 + center) * 2.0 * SCALE;
-
-        'l3a: for n in 0..ITERATIONS {
-            c -= f.eval8(c) / df.eval8(c) * A;
-            if n % 10 == 0 {
-                for root in roots.iter() {
-                    if (c - root).norm().lanes_lt(f64x8::splat(EPSILON)).all() {
-                        break 'l3a;
-                    }
-                }
+    if USE_SIMD {
+        while x + 7 < WIDTH {
+            let mut c = [Complex::new(0.0, 0.0); 8];
+            for i in 0..8u32 {
+                c[i as usize] = Complex::new((x + i) as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0);
             }
-        }
+            let mut c = Complex8::from(c) / WIDTH.max(HEIGHT) as f64 * 2.0 * SCALE + center;
 
-        let c: [Complex<f64>; 8] = c.into();
-        for dx in 0..8u32 {
-            let mut color = roots.len();
-            for i in 0..roots.len() {
-                if (c[dx as usize] - roots[i]).norm() < EPSILON {
-                    color = i;
-                }
+            c = newton_raphson8(c, f, df, roots);
+
+            let c: [Complex<f64>; 8] = c.into();
+            for dx in 0..8u32 {
+                find_color(c[dx as usize], x + dx, y, roots, table);
             }
-            table[(x + dx + y * WIDTH) as usize] = color;
+
+            x += 8;
         }
 
-        x += 8;
+        if x > 7 {
+            x -= 7; // we might have unfinished work to do
+        }
     }
-    x -= 7;
+
     while x < WIDTH {
-        let mut c = (Complex::new(x as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0) / (WIDTH.max(HEIGHT)) as f64 + center) * 2.0 * SCALE;
+        let mut c = Complex::new(x as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0) / (WIDTH.max(HEIGHT)) as f64 * 2.0 * SCALE + center;
 
-        'l3b: for n in 0..ITERATIONS {
-            c -= f.eval(c) / df.eval(c) * A;
-            if n % 10 == 0 {
-                for root in roots.iter() {
-                    if (c - root).norm() < EPSILON {
-                        break 'l3b;
-                    }
-                }
-            }
-        }
+        c = newton_raphson(c, f, df, roots);
 
-        let mut color = roots.len();
-        for i in 0..roots.len() {
-            if (c - roots[i]).norm() < EPSILON {
-                color = i;
-            }
-        }
-        table[(x + y * WIDTH) as usize] = color;
+        find_color(c, x, y, roots, table);
 
         x += 1;
     }
+}
+
+fn newton_raphson(mut c: Complex<f64>, f: &Polynomial, df: &Polynomial, roots: &[Complex<f64>]) -> Complex<f64> {
+    for n in 0..ITERATIONS {
+        c -= f.eval(c) / df.eval(c) * A;
+        if n % 10 == 0 {
+            for root in roots.iter() {
+                if (c - root).norm() < EPSILON {
+                    return c;
+                }
+            }
+        }
+    }
+
+    c
+}
+
+fn newton_raphson8(mut c: Complex8, f: &Polynomial, df: &Polynomial, roots: &[Complex<f64>]) -> Complex8 {
+    for n in 0..ITERATIONS {
+        c -= f.eval8(c) / df.eval8(c) * A;
+        if n % 10 == 0 {
+            for root in roots.iter() {
+                if (c - root).norm().lanes_lt(f64x8::splat(EPSILON)).all() {
+                    return c;
+                }
+            }
+        }
+    }
+
+    c
+}
+
+fn find_color(c: Complex<f64>, x: u32, y: u32, roots: &[Complex<f64>], table: &mut [usize]) {
+    let mut color = roots.len();
+    for i in 0..roots.len() {
+        if (c - roots[i]).norm() < EPSILON {
+            color = i;
+        }
+    }
+    table[(x + y * WIDTH) as usize] = color;
 }

@@ -18,7 +18,7 @@ impl Complex8 {
 
     pub fn norm(&self) -> f64x8 {
         let re: f64x8 = self.re * self.re;
-        self.im.mul_add(self.im, re)
+        self.im * self.im + re
     }
 }
 
@@ -196,13 +196,13 @@ impl std::ops::MulAssign<Complex8> for Complex8 {
     #[inline]
     fn mul_assign(&mut self, other: Complex8) {
         // im = -xi * yi
-        let im: f64x8 = -(self.im * other.im);
+        let im: f64x8 = self.im * other.im;
         // comp = xr * yi
         let comp: f64x8 = self.re * other.im;
         // xi = xi * yr + comp = xi & yr + xr * yi
-        self.im = self.im.mul_add(other.re, comp);
-        // xr = xr * yr + im = xr * yr - xi * yi
-        self.re = self.re.mul_add(other.re, im);
+        self.im = self.im * other.re + comp;
+        // xr = xr * yr - im = xr * yr - xi * yi
+        self.re = self.re * other.re - im;
     }
 }
 
@@ -301,13 +301,13 @@ impl std::ops::DivAssign<Complex8> for Complex8 {
         // comp = -xr * yi
         let comp: f64x8 = -(self.re * other.im);
         // xi = xi * yr + comp = xi * yr - xr * yi
-        self.im = self.im.mul_add(other.re, comp);
+        self.im = self.im * other.re + comp;
         // xr = xr * yr + im = xr * yr + xi * yi
-        self.re = self.re.mul_add(other.re, im);
+        self.re = self.re * other.re + im;
         // yr * yr
         let re2: f64x8 = other.re * other.re;
         // norm = yi * yi + re2 = yi * yi + yr * yr
-        let norm: f64x8 = other.im.mul_add(other.im, re2);
+        let norm: f64x8 = other.im * other.im + re2;
         // xr /= norm = (xr * yr + xi * yi) / (yr * yr + yi * yi)
         self.re /= norm;
         // xi /= norm = (xi * yr - xr * yi) / (yr * yr + yi * yi)
