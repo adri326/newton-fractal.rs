@@ -1,14 +1,21 @@
+#![feature(portable_simd)]
+
 extern crate image;
 use image::{RgbImage, Rgb};
 use num::complex::Complex;
 use num::traits::FloatConst;
+use core_simd::f64x8;
 
 mod polynomial;
 pub use polynomial::Polynomial;
-const WIDTH: u32 = 1000;
-const HEIGHT: u32 = 1000;
+
+mod complex_simd;
+use complex_simd::Complex8;
+
+const WIDTH: u32 = 100;
+const HEIGHT: u32 = 100;
 const ITERATIONS: usize = 1000;
-const SCALE: f64 = 3.3;
+const SCALE: f64 = 0.3;
 const EPSILON: f64 = 0.02;
 const A: f64 = 1.8;
 
@@ -31,8 +38,8 @@ fn spiral(length: usize) -> Vec<Complex<f64>> {
 }
 
 fn main() {
-    // let center = Complex::new(1.414, 0.0);
-    let center = Complex::new(0.0, 0.0);
+    let center = Complex::new(1.414, 0.0);
+    // let center = Complex::new(0.0, 0.0);
     let mut roots = ring(8).into_iter().chain(ring(8).into_iter().map(|x| 2.0 * x)).collect::<Vec<_>>();
     roots.push(Complex::new(0.0, 0.0));
     // let roots = spiral(8).into_iter().chain(spiral(8).into_iter().map(|x| -x)).collect::<Vec<_>>();
@@ -68,32 +75,7 @@ fn main() {
         if y % (HEIGHT / 100) == 0 {
             println!("{:.2}%", y as f32 / HEIGHT as f32 * 100.0);
         }
-        for x in 0..WIDTH {
-            let mut c = (Complex::new(x as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0) / (WIDTH.max(HEIGHT)) as f64 + center) * 2.0 * SCALE;
-
-            'l3: for n in 0..ITERATIONS {
-                c -= f.eval(c) / df.eval(c) * A;
-                // if n % 10 == 0 {
-                    for root in roots.iter() {
-                        if (c - root).norm() < EPSILON {
-                            steps[(x + y * WIDTH) as usize] = n;
-                            break 'l3;
-                        }
-                    }
-                // }
-            }
-            if steps[(x + y * WIDTH) as usize] == 0 {
-                steps[(x + y * WIDTH) as usize] = ITERATIONS;
-            }
-
-            let mut color = roots.len();
-            for i in 0..roots.len() {
-                if (c - roots[i]).norm() < EPSILON {
-                    color = i;
-                }
-            }
-            table[(x + y * WIDTH) as usize] = color;
-        }
+        calc_row(y, &mut table, &roots, &f, &df, &center);
     }
 
     println!("Drawing...");
@@ -162,4 +144,65 @@ fn main() {
     }
 
     image.save("output.png").unwrap();
+}
+
+
+fn calc_row(y: u32, table: &mut [usize], roots: &[Complex<f64>], f: &Polynomial, df: &Polynomial, center: &Complex<f64>) {
+    let mut x: u32 = 0;
+    while x + 7 < WIDTH {
+        let mut c = [Complex::new(0.0, 0.0); 8];
+        for i in 0..8u32 {
+            c[i as usize] = Complex::new((x + i) as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0);
+        }
+        let mut c = (Complex8::from(c) / WIDTH.max(HEIGHT) as f64 + center) * 2.0 * SCALE;
+
+        'l3a: for n in 0..ITERATIONS {
+            c -= f.eval8(c) / df.eval8(c) * A;
+            if n % 10 == 0 {
+                for root in roots.iter() {
+                    if (c - root).norm().lanes_lt(f64x8::splat(EPSILON)).all() {
+                        break 'l3a;
+                    }
+                }
+            }
+        }
+
+        let c: [Complex<f64>; 8] = c.into();
+        for dx in 0..8u32 {
+            let mut color = roots.len();
+            for i in 0..roots.len() {
+                if (c[dx as usize] - roots[i]).norm() < EPSILON {
+                    color = i;
+                }
+            }
+            table[(x + dx + y * WIDTH) as usize] = color;
+        }
+
+        x += 8;
+    }
+    x -= 7;
+    while x < WIDTH {
+        let mut c = (Complex::new(x as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0) / (WIDTH.max(HEIGHT)) as f64 + center) * 2.0 * SCALE;
+
+        'l3b: for n in 0..ITERATIONS {
+            c -= f.eval(c) / df.eval(c) * A;
+            if n % 10 == 0 {
+                for root in roots.iter() {
+                    if (c - root).norm() < EPSILON {
+                        break 'l3b;
+                    }
+                }
+            }
+        }
+
+        let mut color = roots.len();
+        for i in 0..roots.len() {
+            if (c - roots[i]).norm() < EPSILON {
+                color = i;
+            }
+        }
+        table[(x + y * WIDTH) as usize] = color;
+
+        x += 1;
+    }
 }

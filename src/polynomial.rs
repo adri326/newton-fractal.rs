@@ -1,5 +1,6 @@
 use num::complex::Complex;
 use std::fmt;
+use super::complex_simd::Complex8;
 
 #[derive(Clone, Debug)]
 pub struct Polynomial {
@@ -76,7 +77,19 @@ impl Polynomial {
         let mut res = Complex::new(0.0, 0.0);
 
         for &x in self.params.iter() {
-            res += x * acc;
+            res += acc * x;
+            acc *= z;
+        }
+
+        res
+    }
+
+    pub fn eval8(&self, z: Complex8) -> Complex8 {
+        let mut acc = Complex8::from_complex(Complex::new(1.0, 0.0));
+        let mut res = Complex8::from_complex(Complex::new(0.0, 0.0));
+
+        for &x in self.params.iter() {
+            res += acc * x;
             acc *= z;
         }
 

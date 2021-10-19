@@ -57,6 +57,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
+name = "core_simd"
+version = "0.1.0"
+source = "git+https://github.com/rust-lang/portable-simd#5b4282edcd01089df26e2e2c268c4dc1c361dd91"
+
+[[package]]
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -226,6 +231,7 @@ dependencies = [
 name = "newton"
 version = "0.1.0"
 dependencies = [
+ "core_simd",
  "image",
  "num",
  "rug",
