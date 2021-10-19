@@ -218,6 +218,7 @@ dependencies = [
  "core_simd",
  "image",
  "num",
+ "scoped_threadpool",
 ]
 
 [[package]]

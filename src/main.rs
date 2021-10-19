@@ -1,24 +1,29 @@
 #![feature(portable_simd)]
 
+extern crate scoped_threadpool;
 extern crate image;
+extern crate core_simd;
+
+mod polynomial;
+mod complex_simd;
+mod newton;
+
+use std::sync::{Arc, Mutex};
 use image::{RgbImage, Rgb};
 use num::complex::Complex;
 use num::traits::FloatConst;
+use scoped_threadpool::Pool;
 
-mod polynomial;
 pub use polynomial::Polynomial;
-
-mod complex_simd;
-
-mod newton;
 use newton::calc_row;
 
-const WIDTH: u32 = 1000;
-const HEIGHT: u32 = 1000;
+const WIDTH: u32 = 8000;
+const HEIGHT: u32 = 8000;
 const ITERATIONS: usize = 1000;
 const SCALE: f64 = 0.3;
 const EPSILON: f64 = 0.02;
 const A: f64 = 1.8;
+const THREADS: u32 = 16;
 
 pub const USE_SIMD: bool = false;
 
@@ -49,7 +54,7 @@ fn spiral(length: usize) -> Vec<Complex<f64>> {
 }
 
 fn main() {
-    let center = Complex::new(1.414, 0.0);
+    let center = Complex::new(0.85, 0.0);
     let mut roots = ring(8).into_iter().chain(ring(8).into_iter().map(|x| 2.0 * x)).collect::<Vec<_>>();
     roots.push(Complex::new(0.0, 0.0));
 
@@ -68,12 +73,37 @@ fn main() {
     let mut image = RgbImage::new(WIDTH, HEIGHT);
     let mut table = vec![0; (WIDTH * HEIGHT) as usize];
 
-    for y in 0..HEIGHT {
-        if y % (HEIGHT / 100) == 0 {
-            println!("{:.2}%", y as f32 / HEIGHT as f32 * 100.0);
+    let mut pool = Pool::new(THREADS);
+    let table = Mutex::new(table);
+    pool.scoped(|scoped| {
+        let table = Arc::new(&table);
+        let poly_info = &poly_info;
+        let center = &center;
+        for y in 0..HEIGHT {
+            let table = Arc::clone(&table);
+            scoped.execute(move || {
+                let mut local_table = vec![0; WIDTH as usize];
+                calc_row(y, &mut local_table, poly_info, center);
+
+                match table.lock() {
+                    Ok(mut lock) => {
+                        unsafe {
+                            for x in 0..WIDTH {
+                                lock[(x + y * WIDTH) as usize] = local_table[x as usize];
+                            }
+                            // std::ptr::copy_nonoverlapping(
+                            //     local_table.as_ptr(),
+                            //     lock.as_mut_ptr().add((y * WIDTH) as usize),
+                            //     (HEIGHT / THREADS) as usize
+                            // );
+                        }
+                    }
+                    Err(e) => panic!("{}", e),
+                }
+            });
         }
-        calc_row(y, &mut table, &poly_info, &center);
-    }
+    });
+    let table = table.into_inner().unwrap();
 
     println!("Drawing...");
 

@@ -18,7 +18,7 @@ pub fn calc_row(y: u32, table: &mut [usize], info: &PolyInfo, center: &Complex<f
 
           let c: [Complex<f64>; 8] = c.into();
           for dx in 0..8u32 {
-              find_color(c[dx as usize], x + dx, y, info, table);
+              find_color(c[dx as usize], x + dx, info, table);
           }
 
           x += 8;
@@ -34,7 +34,7 @@ pub fn calc_row(y: u32, table: &mut [usize], info: &PolyInfo, center: &Complex<f
 
       c = newton_raphson(c, info);
 
-      find_color(c, x, y, info, table);
+      find_color(c, x, info, table);
 
       x += 1;
   }
@@ -70,12 +70,12 @@ pub fn newton_raphson8(mut c: Complex8, info: &PolyInfo) -> Complex8 {
   c
 }
 
-fn find_color(c: Complex<f64>, x: u32, y: u32, info: &PolyInfo, table: &mut [usize]) {
+fn find_color(c: Complex<f64>, x: u32, info: &PolyInfo, table: &mut [usize]) {
     let mut color = info.roots.len();
     for i in 0..info.roots.len() {
         if (c - info.roots[i]).norm() < EPSILON {
             color = i;
         }
     }
-    table[(x + y * WIDTH) as usize] = color;
+    table[x as usize] = color;
 }
