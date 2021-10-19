@@ -3,19 +3,23 @@
 extern crate scoped_threadpool;
 extern crate image;
 extern crate core_simd;
+extern crate distance_transform;
 
 mod polynomial;
 mod complex_simd;
 mod newton;
+mod edge;
 
 use std::sync::{Arc, Mutex};
 use image::{RgbImage, Rgb};
 use num::complex::Complex;
 use num::traits::FloatConst;
 use scoped_threadpool::Pool;
+use distance_transform::*;
 
 pub use polynomial::Polynomial;
 use newton::calc_row;
+use edge::is_edge;
 
 const WIDTH: u32 = 8000;
 const HEIGHT: u32 = 8000;
@@ -71,8 +75,10 @@ fn main() {
     };
 
     let mut image = RgbImage::new(WIDTH, HEIGHT);
-    let mut table = vec![0; (WIDTH * HEIGHT) as usize];
+    let table = vec![0; (WIDTH * HEIGHT) as usize];
 
+    // Compute the actual fractal
+    println!("Running the Newton-Raphson algorithm...");
     let mut pool = Pool::new(THREADS);
     let table = Mutex::new(table);
     pool.scoped(|scoped| {
@@ -87,15 +93,8 @@ fn main() {
 
                 match table.lock() {
                     Ok(mut lock) => {
-                        unsafe {
-                            for x in 0..WIDTH {
-                                lock[(x + y * WIDTH) as usize] = local_table[x as usize];
-                            }
-                            // std::ptr::copy_nonoverlapping(
-                            //     local_table.as_ptr(),
-                            //     lock.as_mut_ptr().add((y * WIDTH) as usize),
-                            //     (HEIGHT / THREADS) as usize
-                            // );
+                        for x in 0..WIDTH {
+                            lock[(x + y * WIDTH) as usize] = local_table[x as usize];
                         }
                     }
                     Err(e) => panic!("{}", e),
@@ -105,19 +104,34 @@ fn main() {
     });
     let table = table.into_inner().unwrap();
 
+    // Compute "edge" matrix
+    println!("Computing edge matrix...");
+    let mut edge = BoolGrid::new(WIDTH as usize, HEIGHT as usize);
+    for y in 0..HEIGHT {
+        for x in 0..WIDTH {
+            edge.set(x as usize, y as usize, is_edge(x, y, &table));
+        }
+    }
+
+    // let proximity = vec![0.0; (WIDTH * HEIGHT) as usize];
+    println!("Computing proximity matrix...");
+    let proximity = dt2d(&edge);
+
     println!("Drawing...");
 
     for y in 0..HEIGHT {
         for x in 0..WIDTH {
             let color = table[(x + y * WIDTH) as usize];
 
-            if color == poly_info.roots.len() || is_edge(x, y, &table) {
+            if color == poly_info.roots.len() {
                 image.put_pixel(x, y, Rgb([0, 0, 0]));
             } else {
                 let a = color as f64 / poly_info.roots.len() as f64 * 2.0 * f64::PI();
-                let r = 200.0;
-                let g = (a.sin() + 1.0) / 2.0 * 150.0 + 50.0;
-                let b = (-a.cos() + 1.0) / 2.0 * 150.0 + 50.0;
+                let p = *proximity.get(x as usize, y as usize).unwrap();
+                let p = sigma(p.powf(0.5) / (p + 2.0).ln() / 8.0).powf(0.5);
+                let r = 240.0 * p;
+                let g = ((a.sin() + 1.0) / 2.0 * 150.0 + 80.0) * p;
+                let b = ((-a.cos() + 1.0) / 2.0 * 150.0 + 80.0) * p;
                 image.put_pixel(x, y, Rgb([r as u8, g as u8, b as u8]));
             }
             // image.put_pixel(x, y, Rgb([(200.0 - re * 200.0) as u8, (200.0 - im * 200.0) as u8, 128u8]))
@@ -127,48 +141,6 @@ fn main() {
     image.save("output.png").unwrap();
 }
 
-fn is_edge(x: u32, y: u32, table: &[usize]) -> bool {
-    let color = table[(x + y * WIDTH) as usize];
-    if x > 0 {
-        if table[(x - 1 + y * WIDTH) as usize] != color {
-            return true;
-        }
-        if y > 0 {
-            if table[(x - 1 - WIDTH + y * WIDTH) as usize] != color {
-                return true;
-            }
-        }
-        if y < HEIGHT - 1 {
-            if table[(x - 1 + WIDTH + y * WIDTH) as usize] != color {
-                return true;
-            }
-        }
-    }
-    if x < WIDTH - 1 {
-        if table[(x + 1 + y * WIDTH) as usize] != color {
-            return true;
-        }
-        if y > 0 {
-            if table[(x + 1 - WIDTH + y * WIDTH) as usize] != color {
-                return true;
-            }
-        }
-        if y < HEIGHT - 1 {
-            if table[(x + 1 + WIDTH + y * WIDTH) as usize] != color {
-                return true;
-            }
-        }
-    }
-    if y > 0 {
-        if table[(x - WIDTH + y * WIDTH) as usize] != color {
-            return true;
-        }
-    }
-    if y < HEIGHT - 1 {
-        if table[(x + WIDTH + y * WIDTH) as usize] != color {
-            return true;
-        }
-    }
-
-    return false;
+fn sigma(x: f64) -> f64 {
+    1.0 - (-x).exp()
 }

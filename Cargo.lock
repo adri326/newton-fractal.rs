@@ -119,6 +119,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "distance-transform"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "197de3db89e91eeb75d1efcdde7ad77e7a78bec12396df64fda1097b39e275f0"
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -216,6 +222,7 @@ name = "newton"
 version = "0.1.0"
 dependencies = [
  "core_simd",
+ "distance-transform",
  "image",
  "num",
  "scoped_threadpool",

@@ -10,6 +10,7 @@ image = "0.23"
 num = "0.4.0"
 core_simd = { git = "https://github.com/rust-lang/portable-simd" }
 scoped_threadpool = "0.1.*"
+distance-transform = "0.1.2"
 
 # [dependencies.rug]
 # version = "1.12"
