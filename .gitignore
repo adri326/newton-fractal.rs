@@ -1,3 +1,7 @@
 /target
 callgrind.out.*
 *.png
+*.png.kra
+*.png~
+*.mkv
+*.mp4

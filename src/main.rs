@@ -21,14 +21,14 @@ pub use polynomial::Polynomial;
 use newton::calc_row;
 use draw::{is_edge, gaussian_blur};
 
-const WIDTH: usize = 1920 * 2;
-const HEIGHT: usize = 1080 * 2;
+const WIDTH: usize = 1080 * 3;
+const HEIGHT: usize = 1350 * 3;
 const ITERATIONS: usize = 1000;
-const SCALE: f64 = 24.0;
+const SCALE: f64 = 36.0;
 const EPSILON: f64 = 0.02;
 const A: f64 = 1.95;
 const THREADS: u32 = 16;
-const FRAMES: usize = 100;
+const FRAMES: usize = 800;
 const SHADOW: (f64, f64) = (0.2, 0.9);
 const SHADOW_STRENGTH: f64 = 1.0;
 
@@ -83,6 +83,7 @@ fn spiral(length: usize, angle: f64, coeff: f64) -> Vec<Complex<f64>> {
 fn fractal(frame: usize, center: Complex<f64>) {
     println!("Begin frame {}", frame);
     let frame_ratio = frame as f64 / FRAMES as f64;
+    let frame_ratio = -(frame_ratio * f64::PI()).cos() * 0.5 + 0.5;
     let shadow = normalize(SHADOW);
     let mut roots = ringoid(8, frame_ratio * 7.0 + 2.0).into_iter().map(|x| Complex::new((0.02 * frame_ratio).cos(), (0.02 * frame_ratio).sin()) * x).collect::<Vec<_>>();
     // let mut roots = ring(8).into_iter().chain(ring(8).into_iter().map(|x| 2.0 * x)).collect::<Vec<_>>();
