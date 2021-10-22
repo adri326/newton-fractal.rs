@@ -4,21 +4,21 @@ use core_simd::f64x8;
 use num::complex::Complex;
 // use super::polynomial::Polynomial;
 
-pub fn calc_row(y: u32, table: &mut [usize], info: &PolyInfo, center: &Complex<f64>) {
-  let mut x: u32 = 0;
+pub fn calc_row(y: usize, table: &mut [usize], info: &PolyInfo, center: &Complex<f64>) {
+  let mut x: usize = 0;
   if USE_SIMD {
       while x + 7 < WIDTH {
           let mut c = [Complex::new(0.0, 0.0); 8];
-          for i in 0..8u32 {
-              c[i as usize] = Complex::new((x + i) as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0);
+          for i in 0..8 {
+              c[i] = Complex::new((x + i) as f64 - WIDTH as f64 / 2.0, y as f64 - HEIGHT as f64 / 2.0);
           }
           let mut c = Complex8::from(c) / WIDTH.max(HEIGHT) as f64 * 2.0 * SCALE + center;
 
           c = newton_raphson8(c, info);
 
           let c: [Complex<f64>; 8] = c.into();
-          for dx in 0..8u32 {
-              find_color(c[dx as usize], x + dx, info, table);
+          for dx in 0..8 {
+              find_color(c[dx], x + dx, info, table);
           }
 
           x += 8;
@@ -70,12 +70,12 @@ pub fn newton_raphson8(mut c: Complex8, info: &PolyInfo) -> Complex8 {
   c
 }
 
-fn find_color(c: Complex<f64>, x: u32, info: &PolyInfo, table: &mut [usize]) {
+fn find_color(c: Complex<f64>, x: usize, info: &PolyInfo, table: &mut [usize]) {
     let mut color = info.roots.len();
     for i in 0..info.roots.len() {
         if (c - info.roots[i]).norm() < EPSILON {
             color = i;
         }
     }
-    table[x as usize] = color;
+    table[x] = color;
 }
