@@ -2,6 +2,8 @@
 
 This is a Rust implementation of the [Newton Fractal](https://en.wikipedia.org/wiki/Newton_fractal).
 
+[See an animation of it here](https://odysee.com/@ShadAmethyst:9/newton-fractal-expanding-ngon:8) ([SD but noisier version](https://odysee.com/@ShadAmethyst:9/newton-fractal-expanding-ngon-sd:f)).
+
 As of right now, all of the customization is done through hard-coded constants in `src/main.rs`.
 The code is currently in a spaghetti state. Sorry for that :)
 
